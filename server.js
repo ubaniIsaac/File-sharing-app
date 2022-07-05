@@ -8,9 +8,9 @@ require('dotenv').config()
 
 const express = require('express')
 const app = express()
+app.use(express.urlencoded({ extended: true }))
 
 const upload = multer({ dest: "uploads/" })
-
 
 app.set("view engine", "ejs")
 
@@ -28,17 +28,38 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     }
 
     const file = await File.create(fileData)
-    // console.log(file)
-    // res.send(file.originalName)
-
     res.render("index", { fileLink: `${req.headers.origin}/file/${file.id}` })
 
 })
 
-app.get("/file/:id", (req, res) => {
+app.get("/file/:id", handleDownload)
+app.post("/file/:id", handleDownload)
 
-})
+async function handleDownload(req, res) {
+    const file = await File.findById(req.params.id)
 
+    console.log(file.password)
+    if (file.password != null) {
+        if (req.body.password == null) {
+            console.log(req.body.password)
+
+            res.render("password")
+            return
+        }
+
+        if (!(await bcrypt.compare(req.body.password, file.password))) {
+            res.render("password", { error: true })
+            return
+        }
+    }
+
+    file.downloadCount++
+    await file.save()
+    console.log(file.downloadCount)
+
+    res.download(file.path, file.originalName)
+
+}
 
 
 app.listen(process.env.PORT, () => {
